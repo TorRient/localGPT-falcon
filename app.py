@@ -247,9 +247,8 @@ def main():
         title = """
             <div style="text-align: center;">
                 <h1>LocalGPT with Falcon</h1>
-                <p style="text-align: center;">Upload your docs (.pdf, .docx, .csv, .txt .md) click the "Load docs to LangChain" after upload is complete , <br />
+                <p style="text-align: center;">Upload your docs (.pdf, .docx, .csv, .txt .md) by clicking the "Load docs to LangChain" and wait until the upload is complete, <br />
                 when everything is ready, you can start asking questions about the docs <br />
-                This version is set to store chat history</p>
             </div>
         """
         gr.HTML(title)
