@@ -5,7 +5,7 @@ Change logs: I replaced the [Vicuna-7B](https://huggingface.co/TheBloke/vicuna-7
 
 WebUI using Gradio.
 ```
-python app.py
+python app.py --device_type ["cpu", "cuda"]
 ```
 
 Open http://localhost:7860 on your browser and interact with the app.
