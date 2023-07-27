@@ -4,13 +4,13 @@ from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceInstructEmbeddings
 from langchain.llms import HuggingFacePipeline
 from constants import CHROMA_SETTINGS, PERSIST_DIRECTORY
-from transformers import AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import click
 import torch
 from constants import CHROMA_SETTINGS
 
 
-def load_model():
+def load_model(device):
     """
     Select a model on huggingface.
     If you are running this for the first time, it will download a model for you.
@@ -18,14 +18,19 @@ def load_model():
     """
     model = "tiiuae/falcon-7b-instruct"
 
-    tokenizer = AutoTokenizer.from_pretrained(model)
+    if device == "cuda":
+        tokenizer = AutoTokenizer.from_pretrained(model)
+    else: # cpu
+        tokenizer=AutoTokenizer.from_pretrained(model)
+        model=AutoModelForCausalLM.from_pretrained(model)
+    
     pipe = pipeline(
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float32 if device =="cpu" else torch.bfloat16,
         trust_remote_code=True,
-        device_map="auto",
+        device_map=device if device =="cpu" else "auto",
         max_length=2048,
         temperature=0,
         top_p=0.95,
@@ -73,7 +78,7 @@ def main(device_type, ):
     # Prepare the LLM
     # callbacks = [StreamingStdOutCallbackHandler()]
     # load the LLM for generating Natural Language responses. 
-    llm = load_model()
+    llm = load_model(device)
     qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=True)
     # Interactive questions and answers
     while True:
