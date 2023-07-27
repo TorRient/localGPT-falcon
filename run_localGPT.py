@@ -22,7 +22,7 @@ def load_model(device):
         tokenizer = AutoTokenizer.from_pretrained(model)
     else: # cpu
         tokenizer=AutoTokenizer.from_pretrained(model)
-        model=AutoModelForCausalLM.from_pretrained(model)
+        model=AutoModelForCausalLM.from_pretrained(model, trust_remote_code=True)
     
     pipe = pipeline(
         "text-generation",
