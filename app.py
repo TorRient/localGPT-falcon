@@ -28,7 +28,12 @@ import torch
 # FAISS instead of PineCone
 from langchain.vectorstores import  Chroma
 from loguru import logger
-from transformers import AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import argparse
+
+parser = argparse.ArgumentParser('LocalGPT falcon', add_help=False)
+parser.add_argument('--device_type', type=str, default="cuda", choices=["cpu", "mps", "cuda"], help='device type', )
+args = parser.parse_args()
 
 
 ROOT_DIRECTORY = Path(__file__).parent
@@ -122,7 +127,7 @@ def upload_files(files):
 
 
 def ingest(
-    file_paths: list, device_type="cpu"
+    file_paths: list
 ):
     """Gen Chroma db.
     torch.cuda.is_available()
@@ -130,12 +135,6 @@ def ingest(
     []
     """
     logger.info("Doing ingest...")
-    if device_type in ["cpu", "CPU"]:
-        device = "cpu"
-    elif device_type in ["mps", "MPS"]:
-        device = "mps"
-    else:
-        device = "cuda"
 
     documents = []
     for file_path in file_paths:
@@ -150,7 +149,7 @@ def ingest(
     # Create embeddings
     logger.info(f"Load InstructEmbeddings model: {INSTRUCTORS_EMBEDDINGS_MODEL}")
     embeddings = HuggingFaceInstructEmbeddings(
-        model_name=INSTRUCTORS_EMBEDDINGS_MODEL, model_kwargs={"device": device}
+        model_name=INSTRUCTORS_EMBEDDINGS_MODEL, model_kwargs={"device": args.device_type}
     )
 
     db = Chroma.from_documents(
@@ -170,19 +169,25 @@ def ingest(
 
 
 # https://huggingface.co/tiiuae/falcon-7b-instruct
-def gen_local_llm(model_id="tiiuae/falcon-7b-instruct"):
+def gen_local_llm():
     """Gen a local llm.
     localgpt run_localgpt
     """
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = "tiiuae/falcon-7b-instruct"
 
+    if args.device_type == "cuda":
+        tokenizer = AutoTokenizer.from_pretrained(model)
+    else: # cpu
+        tokenizer=AutoTokenizer.from_pretrained(model)
+        model=AutoModelForCausalLM.from_pretrained(model, trust_remote_code=True)
+    
     pipe = pipeline(
         "text-generation",
-        model=model_id,
+        model=model,
         tokenizer=tokenizer,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float32 if args.device_type =="cpu" else torch.bfloat16,
         trust_remote_code=True,
-        device_map="auto",
+        device_map="cpu" if args.device_type =="cpu" else "auto",
         max_length=2048,
         temperature=0,
         top_p=0.95,
@@ -193,16 +198,16 @@ def gen_local_llm(model_id="tiiuae/falcon-7b-instruct"):
     )
 
     local_llm = HuggingFacePipeline(pipeline=pipe)
+
     return local_llm
 
 
-def load_qa(device: str = "cpu"):
+def load_qa():
     """Gen qa."""
     logger.info("Doing qa")
-    # device = 'cpu'
 
     embeddings = HuggingFaceInstructEmbeddings(
-        model_name=INSTRUCTORS_EMBEDDINGS_MODEL, model_kwargs={"device": device}
+        model_name=INSTRUCTORS_EMBEDDINGS_MODEL, model_kwargs={"device": args.device_type}
     )
     # xl 4.96G, large 3.5G,
     db = Chroma(
